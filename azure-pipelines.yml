@@ -1,0 +1,49 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+- master
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+- script: echo Deploy to K8s
+  displayName: 'Deploy K8s'
+
+- task: AzureCLI@2
+  inputs:
+    azureSubscription: 'Azure service'
+    scriptType: 'ps'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      # 1. Update the package list
+      sudo apt-get update
+      
+      # 2. Install prerequisites
+      sudo apt-get install -y ca-certificates curl apt-transport-https lsb-release gnupg
+      
+      # 3. Add the Microsoft signing key
+      curl -sL https://packages.microsoft.com/keys/microsoft.asc | \
+        gpg --dearmor | \
+        sudo tee /etc/apt/trusted.gpg.d/microsoft.gpg > /dev/null
+      
+      # 4. Add the Azure CLI software repository
+      AZ_REPO=$(lsb_release -cs)
+      echo "deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ $AZ_REPO main" | \
+        sudo tee /etc/apt/sources.list.d/azure-cli.list
+      
+      # 5. Update the package list and install Azure CLI
+      sudo apt-get update
+      sudo apt-get install -y azure-cli
+- task: KubernetesManifest@1
+  inputs:
+    action: 'deploy'
+    connectionType: 'azureResourceManager'
+    azureSubscriptionConnection: 'Azure service'
+    azureResourceGroup: 'Techie-RG'
+    kubernetesCluster: 'KubernetesCluster'
+    namespace: 'vote'
+    manifests: 'kube-deployment.yml'
