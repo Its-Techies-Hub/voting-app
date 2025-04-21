@@ -2,16 +2,11 @@ trigger:
 - master
 
 pool:
-  name: $(Agent)
-
-variables:
-  helmNamespace: helm
-  argoNamespace: argocd
+  name: Azure Pipelines
 
 steps:
 
 - script: echo "🚀 Starting AKS deployment..."
-  displayName: 'Print Start Message'
 
 # Ensure Azure CLI is installed
 - task: Bash@3
