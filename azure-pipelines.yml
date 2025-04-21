@@ -51,9 +51,9 @@ steps:
         echo "✅ Helm is already installed: $(helm version)"
       fi
 
-# Install NGINX Ingress Controller via Helm
+# Install NGINX Ingress Controller via Helm in the 'helm' namespace
 - task: AzureCLI@2
-  displayName: 'Install NGINX Ingress via Helm'
+  displayName: 'Install NGINX Ingress via Helm in the "helm" Namespace'
   inputs:
     azureSubscription: '$(AzureSubscriptionConnection)'
     scriptType: 'bash'
@@ -68,7 +68,9 @@ steps:
       # Install kubectl if not already installed
       if ! command -v kubectl &>/dev/null; then
         echo "kubectl not found, installing..."
-        az aks install-cli
+        curl -LO https://dl.k8s.io/release/$(curl -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl
+        chmod +x ./kubectl
+        mv ./kubectl /home/azureuser/bin/kubectl  # Ensure proper directory for permission
       fi
 
       echo "📦 Checking if the 'helm' namespace exists..."
@@ -87,11 +89,16 @@ steps:
         echo "✅ Helm already installed: $(helm version)"
       fi
 
+      # Delete the existing NGINX Ingress release if it exists in the 'ingress-nginx' namespace
+      if helm ls --namespace ingress-nginx -q | grep -q nginx-ingress; then
+        echo "Existing NGINX Ingress release found in ingress-nginx namespace, deleting..."
+        helm uninstall nginx-ingress --namespace ingress-nginx
+      fi
+
       # Installing or upgrading NGINX Ingress Controller in the 'helm' namespace
       echo "🔄 Installing or upgrading NGINX Ingress Controller in the 'helm' namespace..."
       helm upgrade --install nginx-ingress ingress-nginx/ingress-nginx \
         --namespace helm
-
 
 # Install Argo CD in AKS using kubectl
 - task: AzureCLI@2
