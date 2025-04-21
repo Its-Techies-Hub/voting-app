@@ -35,8 +35,10 @@ steps:
         --name $(KubernetesCluster-Name) \
         --overwrite-existing
   displayName: 'Get AKS Credentials'
+
+  #Install Helm on Agent
 - task: Bash@3
-  displayName: 'Install Helm on VM'
+  displayName: 'Install Helm on Agent'
   inputs:
     targetType: 'inline'
     script: |
@@ -49,8 +51,7 @@ steps:
         echo "✅ Helm is already installed: $(helm version)"
       fi
 
-
-
+#Install NGINX Ingress via Helm in AKS 
 - task: AzureCLI@2
   displayName: 'Install NGINX Ingress via Helm in AKS'
   inputs:
@@ -70,13 +71,13 @@ steps:
         --namespace ingress-nginx --create-namespace
 
 # Deploy Kubernetes manifest
-- task: KubernetesManifest@1
-  inputs:
-    action: 'deploy'
-    connectionType: '$(ServiceConnection)'
-    azureSubscriptionConnection: '$(AzureSubscriptionConnection)'
-    azureResourceGroup: '$(resource-group)'
-    kubernetesCluster: '$(KubernetesCluster-Name)'
-    namespace: '$(NameSpace-manifests)'
-    manifests: '$(Manifests)'
-  displayName: 'Deploy to AKS'
+# - task: KubernetesManifest@1
+#   inputs:
+#     action: 'deploy'
+#     connectionType: '$(ServiceConnection)'
+#     azureSubscriptionConnection: '$(AzureSubscriptionConnection)'
+#     azureResourceGroup: '$(resource-group)'
+#     kubernetesCluster: '$(KubernetesCluster-Name)'
+#     namespace: '$(NameSpace-manifests)'
+#     manifests: '$(Manifests)'
+#   displayName: 'Deploy to AKS'
