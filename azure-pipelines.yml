@@ -4,119 +4,85 @@ trigger:
 pool:
   name: $(Agent)
 
-steps:
-- script: echo "🚀 Deploy to AKS starting..."
-  displayName: 'Print Deployment Start'
+variables:
+  helmNamespace: helm
+  argoNamespace: argocd
 
-# Optional: Install Azure CLI on the self-hosted agent (if not pre-installed)
+steps:
+
+- script: echo "🚀 Starting AKS deployment..."
+  displayName: 'Print Start Message'
+
+# Ensure Azure CLI is installed
 - task: Bash@3
-  displayName: 'Install Azure CLI (if not present)'
+  displayName: 'Install Azure CLI (if not installed)'
   inputs:
     targetType: 'inline'
     script: |
-      if ! command -v az &> /dev/null
-      then
-        echo "Azure CLI not found. Installing..."
+      if ! command -v az &> /dev/null; then
+        echo "Installing Azure CLI..."
         curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
       else
-        echo "✅ Azure CLI already installed: $(az version)"
+        echo "✅ Azure CLI is already installed."
       fi
 
-# Use Azure CLI to get AKS credentials
+# Get AKS credentials
 - task: AzureCLI@2
+  displayName: 'Get AKS Credentials'
   inputs:
     azureSubscription: 'Azure service'
     scriptType: 'bash'
     scriptLocation: 'inlineScript'
     inlineScript: |
-      echo "🔐 Logging in and setting AKS credentials..."
+      echo "🔐 Fetching AKS credentials..."
       az aks get-credentials \
         --resource-group $(resource-group) \
         --name $(KubernetesCluster-Name) \
         --overwrite-existing
-  displayName: 'Get AKS Credentials'
 
-# Install Helm on Agent
+# Install Helm
 - task: Bash@3
-  displayName: 'Install Helm on Agent'
+  displayName: 'Install Helm (if not installed)'
   inputs:
     targetType: 'inline'
     script: |
-      echo "🔍 Checking if Helm is already installed..."
-      if ! command -v helm &> /dev/null
-      then
+      if ! command -v helm &> /dev/null; then
         echo "📦 Installing Helm..."
         curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
       else
-        echo "✅ Helm is already installed: $(helm version)"
+        echo "✅ Helm is already installed."
       fi
 
-# Install NGINX Ingress Controller via Helm in the 'helm' namespace
+# Create 'helm' namespace and install NGINX Ingress Controller
 - task: AzureCLI@2
-  displayName: 'Install NGINX Ingress via Helm in the "helm" Namespace'
-  inputs:
-    azureSubscription: '$(AzureSubscriptionConnection)'
-    scriptType: 'bash'
-    scriptLocation: 'inlineScript'
-    inlineScript: |
-      echo "🔐 Getting AKS credentials..."
-      az aks get-credentials \
-        --resource-group $(resource-group) \
-        --name $(KubernetesCluster-Name) \
-        --overwrite-existing
-
-      # Install kubectl if not already installed
-      if ! command -v kubectl &>/dev/null; then
-        echo "kubectl not found, installing..."
-        curl -LO https://dl.k8s.io/release/$(curl -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl
-        chmod +x ./kubectl
-        mv ./kubectl /home/azureuser/bin/kubectl  # Ensure proper directory for permission
-      fi
-
-      echo "📦 Checking if the 'helm' namespace exists..."
-      if kubectl get namespace helm; then
-        echo "Namespace 'helm' already exists. Skipping creation."
-      else
-        echo "Namespace 'helm' does not exist. Creating namespace..."
-        kubectl create namespace helm
-      fi
-
-      # Check if Helm is installed
-      if ! command -v helm &>/dev/null; then
-        echo "📦 Helm not found, installing..."
-        curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-      else
-        echo "✅ Helm already installed: $(helm version)"
-      fi
-
-      # Delete the existing NGINX Ingress release if it exists in the 'ingress-nginx' namespace
-      if helm ls --namespace ingress-nginx -q | grep -q nginx-ingress; then
-        echo "Existing NGINX Ingress release found in ingress-nginx namespace, deleting..."
-        helm uninstall nginx-ingress --namespace ingress-nginx
-      fi
-
-      # Installing or upgrading NGINX Ingress Controller in the 'helm' namespace
-      echo "🔄 Installing or upgrading NGINX Ingress Controller in the 'helm' namespace..."
-      helm upgrade --install nginx-ingress ingress-nginx/ingress-nginx \
-        --namespace helm
-
-# Install Argo CD in AKS using kubectl
-- task: AzureCLI@2
+  displayName: 'Install NGINX Ingress Controller via Helm'
   inputs:
     azureSubscription: 'Azure service'
     scriptType: 'bash'
     scriptLocation: 'inlineScript'
     inlineScript: |
-      echo "🔐 Getting AKS credentials..."
-      az aks get-credentials \
-        --resource-group $(resource-group) \
-        --name $(KubernetesCluster-Name) \
-        --overwrite-existing
+      echo "📦 Ensuring '$(helmNamespace)' namespace exists..."
+      kubectl get namespace $(helmNamespace) || kubectl create namespace $(helmNamespace)
 
-      echo "📦 Creating Argo CD namespace..."
-      kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+      echo "🚀 Installing NGINX Ingress via Helm..."
+      helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+      helm repo update
+      helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+        --namespace $(helmNamespace) \
+        --set controller.publishService.enabled=true
 
-      echo "🔄 Installing Argo CD using manifests..."
-      kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+# Install Argo CD in 'argocd' namespace
+- task: AzureCLI@2
+  displayName: 'Install Argo CD'
+  inputs:
+    azureSubscription: 'Azure service'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      echo "📦 Creating namespace '$(argoNamespace)' if it doesn't exist..."
+      kubectl get namespace $(argoNamespace) || kubectl create namespace $(argoNamespace)
 
-      echo "✅ Argo CD installed in AKS!"
+      echo "🚀 Installing Argo CD..."
+      kubectl apply -n $(argoNamespace) -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+      echo "✅ Argo CD installation complete."
