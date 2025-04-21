@@ -64,11 +64,21 @@ steps:
         --name $(KubernetesCluster-Name) \
         --overwrite-existing
       
-      echo "📦 Installing NGINX Ingress Controller using Helm..."
-      helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-      helm repo update
-      helm install nginx-ingress ingress-nginx/ingress-nginx \
-        --namespace ingress-nginx --create-namespace
+      echo "📦 Checking if the 'ingress-nginx' namespace exists..."
+      
+      if kubectl get namespace ingress-nginx; then
+        echo "Namespace 'ingress-nginx' already exists. Skipping creation."
+        echo "🔄 Upgrading NGINX Ingress Controller..."
+        helm upgrade nginx-ingress ingress-nginx/ingress-nginx \
+          --namespace ingress-nginx
+      else
+        echo "Namespace 'ingress-nginx' does not exist. Installing NGINX Ingress Controller..."
+        helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+        helm repo update
+        helm install nginx-ingress ingress-nginx/ingress-nginx \
+          --namespace ingress-nginx --create-namespace
+      fi
+
 
 
 
