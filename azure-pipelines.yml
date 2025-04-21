@@ -61,14 +61,14 @@ steps:
     scriptType: 'bash'
     scriptLocation: 'inlineScript'
     inlineScript: |
-      echo "📦 Ensuring '$(helmNamespace)' namespace exists..."
-      kubectl get namespace $(helmNamespace) || kubectl create namespace $(helmNamespace)
+      echo "📦 Ensuring 'ingress-nginx' namespace exists..."
+      kubectl get namespace ingress-nginx || kubectl create namespace ingress-nginx
 
       echo "🚀 Installing NGINX Ingress via Helm..."
       helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
       helm repo update
       helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
-        --namespace $(helmNamespace) \
+        --namespace ingress-nginx \
         --set controller.publishService.enabled=true
 
 # Install Argo CD in 'argocd' namespace
