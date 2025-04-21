@@ -70,6 +70,28 @@ steps:
       helm install nginx-ingress ingress-nginx/ingress-nginx \
         --namespace ingress-nginx --create-namespace
 
+
+
+- task: AzureCLI@2
+  inputs:
+    azureSubscription: 'Azure service'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      echo "Getting AKS credentials..."
+            az aks get-credentials \
+              --resource-group $(resource-group) \ 
+              --name $(KubernetesCluster-Name) \             
+              --overwrite-existing
+      
+            echo "Creating Argo CD namespace..."
+            kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+      
+            echo "Installing Argo CD using manifests..."
+            kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+      
+            echo "✅ Argo CD installed in AKS!"
+
 # Deploy Kubernetes manifest
 # - task: KubernetesManifest@1
 #   inputs:
