@@ -53,7 +53,7 @@ steps:
         echo "✅ Helm is already installed."
       fi
 
-# Create 'helm' namespace and install NGINX Ingress Controller
+# Install NGINX Ingress Controller
 - task: AzureCLI@2
   displayName: 'Install NGINX Ingress Controller via Helm'
   inputs:
@@ -61,15 +61,17 @@ steps:
     scriptType: 'bash'
     scriptLocation: 'inlineScript'
     inlineScript: |
-      echo "📦 Ensuring 'ingress-nginx' namespace exists..."
-      kubectl get namespace ingress-nginx || kubectl create namespace ingress-nginx
+      echo "📦 Ensuring 'nginx-ingress' namespace exists..."
+      kubectl get namespace nginx-ingress || kubectl create namespace nginx-ingress
 
-      echo "🚀 Installing NGINX Ingress via Helm..."
+      echo "🚀 Installing NGINX Ingress Controller via Helm..."
       helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
       helm repo update
-      helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
-        --namespace ingress-nginx \
+      helm upgrade --install nginx-ingress ingress-nginx/ingress-nginx \
+        --namespace nginx-ingress \
         --set controller.publishService.enabled=true
+
+      echo "✅ NGINX Ingress Controller installation complete."
 
 # Install Argo CD in 'argocd' namespace
 - task: AzureCLI@2
