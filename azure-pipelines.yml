@@ -25,8 +25,8 @@ steps:
 # Use Azure CLI to get AKS credentials
 - task: AzureCLI@2
   inputs:
-    azureSubscription: 'Azure service' 
-    scriptType: 'bash'                 
+    azureSubscription: 'Azure service'
+    scriptType: 'bash'
     scriptLocation: 'inlineScript'
     inlineScript: |
       echo "🔐 Logging in and setting AKS credentials..."
@@ -36,7 +36,7 @@ steps:
         --overwrite-existing
   displayName: 'Get AKS Credentials'
 
-  #Install Helm on Agent
+# Install Helm on Agent
 - task: Bash@3
   displayName: 'Install Helm on Agent'
   inputs:
@@ -51,14 +51,15 @@ steps:
         echo "✅ Helm is already installed: $(helm version)"
       fi
 
-#Install NGINX Ingress via Helm in AKS 
+# Install NGINX Ingress Controller via Helm in the 'helm' namespace
 - task: AzureCLI@2
-  displayName: 'Install NGINX Ingress via Helm in AKS'
+  displayName: 'Install NGINX Ingress via Helm in the "helm" Namespace'
   inputs:
     azureSubscription: '$(AzureSubscriptionConnection)'
     scriptType: 'bash'
     scriptLocation: 'inlineScript'
     inlineScript: |
+      echo "🔐 Getting AKS credentials..."
       az aks get-credentials \
         --resource-group $(resource-group) \
         --name $(KubernetesCluster-Name) \
@@ -70,54 +71,35 @@ steps:
         az aks install-cli
       fi
 
-      echo "📦 Checking if the 'ingress-nginx' namespace exists..."
-      
-      if kubectl get namespace ingress-nginx; then
-        echo "Namespace 'ingress-nginx' already exists. Skipping creation."
+      echo "📦 Checking if the 'helm' namespace exists..."
+      if kubectl get namespace helm; then
+        echo "Namespace 'helm' already exists. Skipping creation."
       else
-        echo "Namespace 'ingress-nginx' does not exist. Creating namespace..."
-        kubectl create namespace ingress-nginx
+        echo "Namespace 'helm' does not exist. Creating namespace..."
+        kubectl create namespace helm
       fi
 
-      echo "🔄 Installing or upgrading NGINX Ingress Controller..."
-      helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-      helm repo update
-
+      echo "🔄 Installing or upgrading NGINX Ingress Controller in the 'helm' namespace..."
       helm upgrade --install nginx-ingress ingress-nginx/ingress-nginx \
-        --namespace ingress-nginx
+        --namespace helm
 
-
-
-
-
+# Install Argo CD in AKS using kubectl
 - task: AzureCLI@2
   inputs:
     azureSubscription: 'Azure service'
     scriptType: 'bash'
     scriptLocation: 'inlineScript'
     inlineScript: |
-      echo "Getting AKS credentials..."
-            az aks get-credentials \
-              --resource-group $(resource-group) \ 
-              --name $(KubernetesCluster-Name) \             
-              --overwrite-existing
-      
-            echo "Creating Argo CD namespace..."
-            kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
-      
-            echo "Installing Argo CD using manifests..."
-            kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-      
-            echo "✅ Argo CD installed in AKS!"
+      echo "🔐 Getting AKS credentials..."
+      az aks get-credentials \
+        --resource-group $(resource-group) \
+        --name $(KubernetesCluster-Name) \
+        --overwrite-existing
 
-# Deploy Kubernetes manifest
-# - task: KubernetesManifest@1
-#   inputs:
-#     action: 'deploy'
-#     connectionType: '$(ServiceConnection)'
-#     azureSubscriptionConnection: '$(AzureSubscriptionConnection)'
-#     azureResourceGroup: '$(resource-group)'
-#     kubernetesCluster: '$(KubernetesCluster-Name)'
-#     namespace: '$(NameSpace-manifests)'
-#     manifests: '$(Manifests)'
-#   displayName: 'Deploy to AKS'
+      echo "📦 Creating Argo CD namespace..."
+      kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+
+      echo "🔄 Installing Argo CD using manifests..."
+      kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+      echo "✅ Argo CD installed in AKS!"
