@@ -2,7 +2,7 @@ trigger:
 - master
 
 pool:
-  name: self-agent
+  name: $(Agent)
 
 steps:
 - script: echo "🚀 Deploy to AKS starting..."
@@ -25,25 +25,27 @@ steps:
 # Use Azure CLI to get AKS credentials
 - task: AzureCLI@2
   inputs:
-    azureSubscription: 'Azure service' # 👈 Make sure this service connection is set to use your Managed Identity or SP
-    scriptType: 'bash'                 # 👈 Fix from ps → bash
+    azureSubscription: 'Azure service' 
+    scriptType: 'bash'                 
     scriptLocation: 'inlineScript'
     inlineScript: |
       echo "🔐 Logging in and setting AKS credentials..."
       az aks get-credentials \
-        --resource-group Techie-RG \
-        --name KubernetesCluster \
+        --resource-group $(resource-group) \
+        --name $(KubernetesCluster-Name) \
         --overwrite-existing
   displayName: 'Get AKS Credentials'
-
+- task: HelmInstaller@1
+  inputs:
+    helmVersionToInstall: 'latest'
 # Deploy Kubernetes manifest
 - task: KubernetesManifest@1
   inputs:
     action: 'deploy'
-    connectionType: 'azureResourceManager'
-    azureSubscriptionConnection: 'Azure service'
-    azureResourceGroup: 'Techie-RG'
-    kubernetesCluster: 'KubernetesCluster'
-    namespace: 'vote'
-    manifests: 'kube-deployment.yml'
+    connectionType: '$(ServiceConnection)'
+    azureSubscriptionConnection: '$(AzureSubscriptionConnection)'
+    azureResourceGroup: '$(resource-group)'
+    kubernetesCluster: '$(KubernetesCluster-Name)'
+    namespace: '$(NameSpace)'
+    manifests: '$(Manifests)'
   displayName: 'Deploy to AKS'
